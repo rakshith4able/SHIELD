@@ -1,0 +1,53 @@
+# For shield-client (Next.js)
+
+# Next.js build output
+shield-client/.next
+shield-client/out
+
+# Log files
+shield-client/npm-debug.log*
+shield-client/yarn-debug.log*
+shield-client/yarn-error.log*
+
+# Dependency directories
+shield-client/node_modules
+
+# Local environment variables
+shield-client/.env
+shield-client/.env.local
+shield-client/.env.development.local
+shield-client/.env.test.local
+shield-client/.env.production.local
+
+# Misc
+shield-client/.DS_Store
+shield-client/.eslintcache
+shield-client/.pnp.*
+shield-client.pnp.js
+
+# TypeScript
+shield-client/*.tsbuildinfo
+
+# For shield-server (Flask)
+
+# Python virtual environment
+shield-server/.venv/
+
+# Python bytecode
+shield-server/*.pyc
+shield-server/__pycache__/
+
+# Environment variables
+shield-server/.env
+shield-server/.flaskenv
+
+# Log files
+shield-server/instance/
+shield-server/*.log
+
+# SQLite database
+shield-server/*.sqlite3
+shield-server/*.db
+
+# Misc
+shield-server/.DS_Store
