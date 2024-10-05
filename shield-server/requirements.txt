@@ -1,5 +1,5 @@
-Flask
-Flask-SocketIO
-opencv-python
-numpy
-Flask-Cors
+Flask==2.3.2
+Flask-SocketIO==5.3.2
+opencv-python==4.6.0.66
+numpy==1.23.5
+flask-cors==3.0.10
