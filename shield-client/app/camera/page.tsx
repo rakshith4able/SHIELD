@@ -14,7 +14,6 @@ const CameraComponent = () => {
     { x: number; y: number; width: number; height: number }[]
   >([]);
   const router = useRouter();
-  const MAX_FRAMES = 30;
 
   useEffect(() => {
     const newSocket = io("http://localhost:5000");
@@ -93,16 +92,9 @@ const CameraComponent = () => {
       return;
     }
 
-    let frameCount = 0;
-
     setCapturing(true);
 
     const intervalId = setInterval(() => {
-      if (frameCount >= MAX_FRAMES) {
-        clearInterval(intervalId);
-        return;
-      }
-
       // Draw the video frame onto the canvas
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       const imageData = canvas.toDataURL("image/jpeg");
@@ -112,7 +104,7 @@ const CameraComponent = () => {
         face_id: userName,
       });
 
-      frameCount++;
+      // No need for frame count check here
     }, 100);
   };
 

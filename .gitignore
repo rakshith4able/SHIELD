@@ -48,6 +48,7 @@ shield-server/*.log
 # SQLite database
 shield-server/*.sqlite3
 shield-server/*.db
+shield-server/dataset/
 
 # Misc
 shield-server/.DS_Store
