@@ -6,6 +6,7 @@ import base64
 import os
 from flask_cors import CORS
 from PIL import Image
+import traceback
 
 app = Flask(__name__)
 CORS(app)
@@ -20,8 +21,8 @@ for dir in ['dataset', 'trainer']:
 # Dictionary to track frames per user
 user_frame_count = {}
 
-face_detector = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 
+face_detector = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 
 # Try to use the face module, fall back to a basic implementation if not available
 try:
@@ -58,9 +59,10 @@ def process_frame(image_data, face_id):
     face_data = []
     # Define the folder path for the user's images
     user_folder = f"dataset/{face_id}"
+    dataset_folder = f"dataset"
     os.makedirs(user_folder, exist_ok=True)
 
-
+    existing_user_count = len(os.listdir(dataset_folder))
     for (x, y, w, h) in faces:
         face_data.append({
             "x": int(x),
@@ -71,40 +73,42 @@ def process_frame(image_data, face_id):
 
         # Save the captured image into the user's folder
         existing_images = len(os.listdir(user_folder))
-        filename = f"{user_folder}/{face_id}.{existing_images + 1}.jpg"
+        filename = f"{user_folder}/{existing_user_count-1}.{face_id}.{existing_images + 1}.jpg"
    
         cv2.imwrite(filename, gray[y:y+h, x:x+w])
 
     return face_data,filename
 
+
+
 def train_model():
     path = 'dataset'
-    folder_paths = [os.path.join(path, f) for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
-    faceSamples = []
+    face_samples = []
     ids = []
 
-    for folderPath in folder_paths:
-        folder_name = os.path.basename(folderPath)  # Use the folder name as the identifier
+    # Process images in dataset
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            if file.endswith(".jpg"):
+                image_path = os.path.join(root, file)
+                face_id = int(file.split(".")[0])  # Extract numeric ID from file name
+                PIL_img = Image.open(image_path).convert('L')  # Convert to grayscale
+                img_numpy = np.array(PIL_img, 'uint8')
 
-        try:
-            for image_file in os.listdir(folderPath):
-                full_image_path = os.path.join(folderPath, image_file)
-                process_image(full_image_path, faceSamples, ids, folder_name)  # Pass folder_name as the ID
-        except Exception as e:
-            print(f"Error processing {folderPath}: {str(e)}")
-            continue
+                faces = face_detector.detectMultiScale(img_numpy)
 
-    if not faceSamples or not ids:
-        print("No faces could be processed. Training aborted.")
+                for (x, y, w, h) in faces:
+                    face_samples.append(img_numpy[y:y+h, x:x+w])
+                    ids.append(face_id)
+
+    if len(face_samples) == 0 or len(ids) == 0:
         return 0, "No faces could be processed. Please check the dataset folder."
 
-    try:
-        recognizer.train(faceSamples, np.array(ids))  # Train with folder names as IDs
-        recognizer.write('trainer/trainer.yml')
-        return len(np.unique(ids)), "Training completed successfully."
-    except Exception as e:
-        print(f"Error during training: {str(e)}")
-        return 0, f"Error during training: {str(e)}"
+    # Train the model
+    recognizer.train(face_samples, np.array(ids))
+    recognizer.write('trainer/trainer.yml')
+    return len(np.unique(ids)), "Training completed successfully."
+
 
 def process_image(image_path, faceSamples, ids, folder_name):
     PIL_img = Image.open(image_path).convert('L')
@@ -166,5 +170,50 @@ def handle_training():
             'status': "An unexpected error occurred. Please check server logs for details."
         })
         
+
+@socketio.on('recognize_face')
+def handle_recognition(data):
+    image_data = data['image']
+
+    # Decode the base64 image
+    encoded_data = image_data.split(',')[1]
+    nparr = np.frombuffer(base64.b64decode(encoded_data), np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+    # Convert to grayscale
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    # Detect faces
+    faces = face_detector.detectMultiScale(gray, 1.3, 5)
+
+    recognition_results = []
+    for (x, y, w, h) in faces:
+        # Perform face recognition
+        id_, confidence = recognizer.predict(gray[y:y+h, x:x+w])
+
+        # Assign a name based on the ID
+        user_names = get_user_names()
+        if confidence < 100:
+            name = user_names[id_]
+            confidence = f"{round(100 - confidence)}%"
+        else:
+            name = "Unknown"
+            confidence = f"{round(100 - confidence)}%"
+
+        recognition_results.append({
+            "x": int(x),
+            "y": int(y),
+            "width": int(w),
+            "height": int(h),
+            "name": name,
+            "confidence": confidence
+        })
+
+    emit('recognition_result', {'faces': recognition_results})
+
+def get_user_names():
+    dataset_path = 'dataset'
+    return [folder for folder in os.listdir(dataset_path) if os.path.isdir(os.path.join(dataset_path, folder))]
+
 if __name__ == '__main__':
     socketio.run(app, debug=True, port=5000)
