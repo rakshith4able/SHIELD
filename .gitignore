@@ -52,3 +52,5 @@ shield-server/dataset/
 
 # Misc
 shield-server/.DS_Store
+shield-server/trainer/
+shield-server/trainer/trainer.yml.npy

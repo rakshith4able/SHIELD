@@ -13,6 +13,8 @@ const CameraComponent = () => {
   const [detectedFaces, setDetectedFaces] = useState<
     { x: number; y: number; width: number; height: number }[]
   >([]);
+  const [status, setStatus] = useState<string>("");
+  const [progress, setProgress] = useState<number>(0);
   const router = useRouter();
 
   useEffect(() => {
@@ -23,10 +25,17 @@ const CameraComponent = () => {
       if (data.faces) {
         setDetectedFaces(data.faces);
       }
-      if (data.completed) {
-        setCapturing(false);
-        router.push("/");
+      if (data.status) {
+        setStatus(data.status);
       }
+      if (data.progress) {
+        setProgress(data.progress);
+      }
+    });
+
+    newSocket.on("capture_completed", (data) => {
+      setStatus(data.status);
+      setTimeout(() => router.push("/"), 3000); // Redirect after 3 seconds
     });
 
     return () => {
@@ -146,7 +155,17 @@ const CameraComponent = () => {
           className="absolute top-0 left-0 pointer-events-none"
         />
       </div>
-      {capturing && <p>Capturing frames... Please wait.</p>}
+      {capturing && (
+        <div className="mt-4">
+          <p>{status}</p>
+          <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+            <div
+              className="bg-blue-600 h-2.5 rounded-full"
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
