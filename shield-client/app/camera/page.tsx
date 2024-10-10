@@ -16,6 +16,7 @@ const CameraComponent = () => {
   const [status, setStatus] = useState<string>("");
   const [progress, setProgress] = useState<number>(0);
   const router = useRouter();
+  const captureIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const newSocket = io("http://localhost:5000");
@@ -34,6 +35,14 @@ const CameraComponent = () => {
     });
 
     newSocket.on("capture_completed", (data) => {
+      setStatus(data.status);
+      setCapturing(false);
+      if (captureIntervalRef.current) {
+        clearInterval(captureIntervalRef.current);
+      }
+    });
+
+    newSocket.on("training_completed", (data) => {
       setStatus(data.status);
       setTimeout(() => router.push("/"), 3000); // Redirect after 3 seconds
     });
@@ -102,8 +111,9 @@ const CameraComponent = () => {
     }
 
     setCapturing(true);
+    setProgress(0);
 
-    const intervalId = setInterval(() => {
+    captureIntervalRef.current = setInterval(() => {
       // Draw the video frame onto the canvas
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       const imageData = canvas.toDataURL("image/jpeg");
@@ -112,8 +122,6 @@ const CameraComponent = () => {
         image: imageData,
         face_id: userName,
       });
-
-      // No need for frame count check here
     }, 100);
   };
 
@@ -136,8 +144,9 @@ const CameraComponent = () => {
         <button
           type="submit"
           className="ml-2 px-4 py-2 bg-blue-500 text-white rounded"
+          disabled={capturing}
         >
-          Start Capturing
+          {capturing ? "Capturing..." : "Start Capturing"}
         </button>
       </form>
       <div className="relative">

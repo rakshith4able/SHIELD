@@ -26,6 +26,12 @@ export default function Home() {
         >
           Train Model
         </Link>
+        <Link
+          href="/recognize"
+          className="px-6 py-3 bg-purple-500 text-white rounded-lg shadow-md hover:bg-purple-700 transition duration-200 text-center"
+        >
+          Face Recognition
+        </Link>
       </div>
     </div>
   );
