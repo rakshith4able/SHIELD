@@ -18,14 +18,9 @@ export default function Home() {
           href="/camera"
           className="px-6 py-3 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-700 transition duration-200 text-center"
         >
-          Capture Images for Training
+          Capture your face
         </Link>
-        <Link
-          href="/train"
-          className="px-6 py-3 bg-green-500 text-white rounded-lg shadow-md hover:bg-green-700 transition duration-200 text-center"
-        >
-          Train Model
-        </Link>
+
         <Link
           href="/recognize"
           className="px-6 py-3 bg-purple-500 text-white rounded-lg shadow-md hover:bg-purple-700 transition duration-200 text-center"

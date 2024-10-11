@@ -36,6 +36,7 @@ const CameraComponent = () => {
 
     newSocket.on("capture_completed", (data) => {
       setStatus(data.status);
+      setDetectedFaces([]);
       setCapturing(false);
       if (captureIntervalRef.current) {
         clearInterval(captureIntervalRef.current);
@@ -166,15 +167,16 @@ const CameraComponent = () => {
       </div>
       {capturing && (
         <div className="mt-4">
-          <p>{status}</p>
+          <p>{progress.toPrecision(2)}%</p>
           <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
             <div
               className="bg-blue-600 h-2.5 rounded-full"
-              style={{ width: `${progress}%` }}
+              style={{ width: `${progress.toPrecision(2)}%` }}
             ></div>
           </div>
         </div>
       )}
+      {status.toLowerCase().includes("training") && <div>{status}</div>}
     </div>
   );
 };

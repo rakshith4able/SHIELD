@@ -8,6 +8,7 @@ from flask_cors import CORS
 from PIL import Image
 import traceback
 import pickle
+import time
 
 app = Flask(__name__)
 CORS(app)
@@ -28,9 +29,14 @@ recognizer = cv2.face.LBPHFaceRecognizer_create()
 
 # Global variable to store user IDs and names
 user_data = {}
+filename=None
 
 def load_user_data():
     global user_data
+    # Ensure the trainer directory exists
+    if not os.path.exists('trainer'):
+        os.makedirs('trainer')  # Create the directory if it doesn't exist
+        
     if os.path.exists('trainer/user_data.pkl'):
         with open('trainer/user_data.pkl', 'rb') as f:
             user_data = pickle.load(f)
@@ -38,8 +44,13 @@ def load_user_data():
         user_data = {}
 
 def save_user_data():
+    # Ensure the trainer directory exists
+    if not os.path.exists('trainer'):
+        os.makedirs('trainer')  # Create the directory if it doesn't exist
+        
     with open('trainer/user_data.pkl', 'wb') as f:
         pickle.dump(user_data, f)
+
 
 def process_frame(image_data, face_id):
     # Decode the base64 image
@@ -122,11 +133,11 @@ def handle_upload(data):
 
     emit('frame_captured', {
         'faces': face_data,
-        'status': f"Captured frame {user_frame_count[face_id]}/30",
-        'progress': (user_frame_count[face_id] / 30) * 100
+        'status': f"Captured frame {user_frame_count[face_id]}/120",
+        'progress': (user_frame_count[face_id] / 120) * 100
     })
 
-    if user_frame_count[face_id] >= 30:
+    if user_frame_count[face_id] >= 120:
         emit('capture_completed', {'status': "Capture completed. Starting training..."})
         trained_faces = train_model_incrementally(face_id)
         emit('training_completed', {
@@ -135,9 +146,12 @@ def handle_upload(data):
         })
         user_frame_count[face_id] = 0
 
+
+
 @socketio.on('recognize_face')
 def handle_recognition(data):
     image_data = data['image']
+    username = data['username']
 
     # Decode the base64 image
     encoded_data = image_data.split(',')[1]
@@ -151,17 +165,15 @@ def handle_recognition(data):
     faces = face_detector.detectMultiScale(gray, 1.3, 5)
 
     recognition_results = []
+    confidence_threshold = 70  # Lowered for better matching
+
     for (x, y, w, h) in faces:
         # Perform face recognition
         id_, confidence = recognizer.predict(gray[y:y+h, x:x+w])
 
         # Assign a name based on the ID
-        if confidence < 70:  # Adjust this threshold for better accuracy
-            name = user_data.get(id_, "Unknown")
-            confidence = f"{round(100 - confidence)}%"
-        else:
-            name = "Unknown"
-            confidence = f"{round(100 - confidence)}%"
+        name = user_data.get(id_, "Unknown")
+        confidence = round(100 - confidence, 2)
 
         recognition_results.append({
             "x": int(x),
@@ -172,7 +184,34 @@ def handle_recognition(data):
             "confidence": confidence
         })
 
-    emit('recognition_result', {'faces': recognition_results})
+    # Emit recognition results immediately
+    emit('recognition_result', {'faces': recognition_results, 'status': 'Processing'})
+
+@socketio.on('get_final_authorization')
+def get_final_authorization(data):
+    recognized_faces = data['recognizedFaces']
+    username = data['username'].lower()
+    
+    authorized = False
+    recognized_name = ""
+    highest_confidence = 0
+    
+    
+    for face in recognized_faces:
+        if face['confidence'] > highest_confidence:
+            highest_confidence = face['confidence']
+            recognized_name = face['name']
+    
+  
+    # Check if the recognized name matches the username (case-insensitive)
+    if highest_confidence > 50 and (username in recognized_name.lower() or recognized_name.lower() in username):
+        authorized = True
+    
+    print(recognized_faces,highest_confidence,username,recognized_name)
+    if authorized:
+        emit('final_authorization', {'status': 'Authorized', 'recognizedAs': recognized_name})
+    else:
+        emit('final_authorization', {'status': 'Unauthorized'})
 
 if __name__ == '__main__':
     load_user_data()
