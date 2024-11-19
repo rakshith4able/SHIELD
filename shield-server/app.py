@@ -1,17 +1,25 @@
-from flask import Flask
-from flask_socketio import SocketIO, emit
+import firebase_admin
+from flask import Flask,request,jsonify
+from flask_socketio import SocketIO, emit,disconnect
 import cv2
 import numpy as np
 import base64
 import os
 from flask_cors import CORS
 from PIL import Image
-import traceback
 import pickle
-import time
+from firebase_admin import auth, credentials, firestore
+from functools import wraps
+
+
+# Initialize Firebase Admin
+cred = credentials.Certificate('./firebase_service.json')
+firebase_admin.initialize_app(cred)
+db = firestore.client()
+
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Ensure the dataset and trainer directories exist
@@ -30,6 +38,103 @@ recognizer = cv2.face.LBPHFaceRecognizer_create()
 # Global variable to store user IDs and names
 user_data = {}
 filename=None
+
+
+
+def verify_token(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = None
+        if 'Authorization' in request.headers:
+            token = request.headers['Authorization'].split(' ')[1]
+        
+        if not token:
+            return jsonify({'message': 'Token is missing'}), 401
+        
+        try:
+            decoded_token = auth.verify_id_token(token)
+            return f(decoded_token, *args, **kwargs)
+        except Exception as e:
+            return jsonify({'message': 'Invalid token'}), 401
+    
+    return decorated_function
+
+@app.route('/verify-user', methods=['POST'])
+def verify_user():
+    data = request.get_json()
+    if not data or 'token' not in data:
+        return jsonify({'authorized': False}), 400
+
+    try:
+        # Verify the Firebase token
+        decoded_token = auth.verify_id_token(data['token'])
+        user_email = decoded_token['email']
+
+        # Check if user exists in Firestore
+        users_ref = db.collection('users')
+        user_doc = users_ref.where('email', '==', user_email).limit(1).get()
+
+        if not len(user_doc):
+            # Create new user if doesn't exist
+            new_user_data = {
+                'email': user_email,
+                'uid': decoded_token['uid'],
+                'role': 'user',
+                'created_at': firestore.SERVER_TIMESTAMP
+            }
+            users_ref.add(new_user_data)
+            return jsonify({
+                'authorized': True,
+                'role': 'user',
+                'isNewUser': True
+            })
+
+        user_data = user_doc[0].to_dict()
+        return jsonify({
+            'authorized': True,
+            'role': user_data.get('role', 'user'),
+            'isNewUser': False
+        })
+
+    except Exception as e:
+        return jsonify({
+            'authorized': False,
+            'message': str(e)
+        }), 401
+
+
+
+def authenticated_only(f):
+    @wraps(f)
+    def wrapped(*args, **kwargs):
+        if not request.args.get('token'):
+            disconnect()
+            return False
+        
+        try:
+            # Verify the Firebase token
+            token = request.args.get('token')
+            decoded_token = auth.verify_id_token(token)
+            
+            # Get user info from Firestore
+            user_ref = db.collection('users').where('email', '==', decoded_token['email']).limit(1).get()
+            
+            if not len(user_ref):
+                disconnect()
+                return False
+            
+            # Add user info to the request context
+            request.user = {
+                'email': decoded_token['email'],
+                'uid': decoded_token['uid'],
+                'role': user_ref[0].to_dict().get('role', 'user')
+            }
+            
+            return f(*args, **kwargs)
+        except:
+            disconnect()
+            return False
+    return wrapped
 
 def load_user_data():
     global user_data
@@ -120,7 +225,22 @@ def train_model_incrementally(new_face_id):
     
     return len(user_data)
 
+@socketio.on('connect')
+def handle_connect():
+    if not request.args.get('token'):
+        disconnect()
+        return False
+    
+    try:
+        token = request.args.get('token')
+        decoded_token = auth.verify_id_token(token)
+        return True
+    except:
+        disconnect()
+        return False
+
 @socketio.on('upload_image')
+@authenticated_only
 def handle_upload(data):
     image_data = data['image']
     face_id = data['face_id']
@@ -140,6 +260,11 @@ def handle_upload(data):
     if user_frame_count[face_id] >= 120:
         emit('capture_completed', {'status': "Capture completed. Starting training..."})
         trained_faces = train_model_incrementally(face_id)
+        db.collection('trained_faces').add({
+            'face_id': face_id,
+            'trained_by': request.user['email'],
+            'trained_at': firestore.SERVER_TIMESTAMP
+        })
         emit('training_completed', {
             'status': f"Training completed. {trained_faces} faces trained.",
             'trained_faces': trained_faces
@@ -149,6 +274,7 @@ def handle_upload(data):
 
 
 @socketio.on('recognize_face')
+@authenticated_only
 def handle_recognition(data):
     image_data = data['image']
     username = data['username']
@@ -183,11 +309,16 @@ def handle_recognition(data):
             "name": name,
             "confidence": confidence
         })
-
+        db.collection('recognition_logs').add({
+                'user_email': request.user['email'],
+                'timestamp': firestore.SERVER_TIMESTAMP,
+                'results': recognition_results
+        })
     # Emit recognition results immediately
     emit('recognition_result', {'faces': recognition_results, 'status': 'Processing'})
 
 @socketio.on('get_final_authorization')
+@authenticated_only
 def get_final_authorization(data):
     recognized_faces = data['recognizedFaces']
     username = data['username'].lower()
@@ -208,6 +339,13 @@ def get_final_authorization(data):
         authorized = True
     
     print(recognized_faces,highest_confidence,username,recognized_name)
+    db.collection('authorization_logs').add({
+        'user_email': request.user['email'],
+        'recognized_as': recognized_name,
+        'confidence': highest_confidence,
+        'authorized': authorized,
+        'timestamp': firestore.SERVER_TIMESTAMP
+    })
     if authorized:
         emit('final_authorization', {'status': 'Authorized', 'recognizedAs': recognized_name})
     else:

@@ -32,6 +32,7 @@ shield-client/*.tsbuildinfo
 
 # Python virtual environment
 shield-server/.venv/
+shield-server/firebase_service.json
 
 # Python bytecode
 shield-server/*.pyc
