@@ -1,8 +1,11 @@
 from flask import Blueprint, request, jsonify,current_app
 from firebase_admin import auth
 from functools import wraps
-from datetime import datetime
+from datetime import datetime,timezone
 from firebase_service import db
+from firebase_admin.firestore import FieldFilter 
+import json
+
 
 users_bp = Blueprint('users', __name__)
 
@@ -17,6 +20,8 @@ def verify_token(f):
         try:
             decoded_token = auth.verify_id_token(token)
             request.user = decoded_token
+            if decoded_token.get('role') != 'admin':
+                return jsonify({'message': 'Permission denied. Admin role required.'}), 403
             return f(*args, **kwargs)
         except Exception as e:
             return jsonify({'message': 'Invalid token'}), 401
@@ -27,7 +32,7 @@ def verify_token(f):
 @verify_token
 def get_users():
     try:
-        users_ref = db.collection('users')
+        users_ref = db.collection('users').where(filter=FieldFilter("role", "==", 'user'))
         users = []
         for doc in users_ref.stream():
             user_data = doc.to_dict()
@@ -44,28 +49,38 @@ def create_user():
         data = request.get_json()
         email = data.get('email')
 
+        # Validate required email field
         if not email:
             return jsonify({'message': 'Email is required'}), 400
-            
         if not email.lower().endswith('@gmail.com'):
             return jsonify({'message': 'Only Gmail addresses are allowed'}), 400
 
-        # Create user in Firebase Authentication
-        user = auth.create_user(
-            email=email,
-            email_verified=False
-        )
+        # Check if a user with this email already exists in Firestore
+        existing_users = db.collection('users').where(filter=FieldFilter('email', '==', email)).get()
+        if existing_users:
+            return jsonify({'message': 'Email already exists'}), 400
 
-        # Store additional user data in Firestore
-        user_ref = db.collection('users').document(user.uid)
-        user_ref.set({
+        # Generate a unique ID for the user
+        user_id = db.collection('users').document().id
+
+        # Prepare user data
+        user_data = {
+            'id': user_id,
+            'name': None,           
+            'photoURL': None,       
             'email': email,
-            'createdAt': datetime.utcnow().isoformat(),
-        })
+            'role': 'user',           
+            'isFaceTrained': False, 
+            'isValidated': False,   
+            'createdAt': datetime.now(timezone.utc),  
+            'updatedAt': datetime.now(timezone.utc)   
+        }
 
-        return jsonify({'message': 'User created successfully'}), 201
-    except auth.EmailAlreadyExistsError:
-        return jsonify({'message': 'Email already exists'}), 400
+        # Store user data in Firestore
+        user_ref = db.collection('users').document(user_id)
+        user_ref.set(user_data)
+
+        return jsonify({'message': 'User created successfully', 'user': user_data}), 201
     except Exception as e:
         return jsonify({'message': str(e)}), 500
 

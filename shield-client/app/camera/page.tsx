@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { useRouter } from "next/navigation";
+import { ProtectedRoute } from "../components/ProtectedRoute";
 
 const CameraComponent = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -132,52 +133,54 @@ const CameraComponent = () => {
   };
 
   return (
-    <div className="flex flex-col items-center">
-      <form onSubmit={handleSubmit} className="mb-4">
-        <input
-          type="text"
-          placeholder="Enter your name"
-          value={userName}
-          onChange={(e) => setUserName(e.target.value)}
-          required
-          className="border border-gray-300 rounded p-2"
-        />
-        <button
-          type="submit"
-          className="ml-2 px-4 py-2 bg-blue-500 text-white rounded"
-          disabled={capturing}
-        >
-          {capturing ? "Capturing..." : "Start Capturing"}
-        </button>
-      </form>
-      <div className="relative">
-        <video
-          ref={videoRef}
-          autoPlay
-          width="640"
-          height="480"
-          className="border rounded"
-        />
-        <canvas
-          ref={canvasRef}
-          width="640"
-          height="480"
-          className="absolute top-0 left-0 pointer-events-none"
-        />
-      </div>
-      {capturing && (
-        <div className="mt-4">
-          <p>{progress.toPrecision(2)}%</p>
-          <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
-            <div
-              className="bg-blue-600 h-2.5 rounded-full"
-              style={{ width: `${progress.toPrecision(2)}%` }}
-            ></div>
-          </div>
+    <ProtectedRoute>
+      <div className="flex flex-col items-center">
+        <form onSubmit={handleSubmit} className="mb-4">
+          <input
+            type="text"
+            placeholder="Enter your name"
+            value={userName}
+            onChange={(e) => setUserName(e.target.value)}
+            required
+            className="border border-gray-300 rounded p-2"
+          />
+          <button
+            type="submit"
+            className="ml-2 px-4 py-2 bg-blue-500 text-white rounded"
+            disabled={capturing}
+          >
+            {capturing ? "Capturing..." : "Start Capturing"}
+          </button>
+        </form>
+        <div className="relative">
+          <video
+            ref={videoRef}
+            autoPlay
+            width="640"
+            height="480"
+            className="border rounded"
+          />
+          <canvas
+            ref={canvasRef}
+            width="640"
+            height="480"
+            className="absolute top-0 left-0 pointer-events-none"
+          />
         </div>
-      )}
-      {status.toLowerCase().includes("training") && <div>{status}</div>}
-    </div>
+        {capturing && (
+          <div className="mt-4">
+            <p>{progress.toPrecision(2)}%</p>
+            <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+              <div
+                className="bg-blue-600 h-2.5 rounded-full"
+                style={{ width: `${progress.toPrecision(2)}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
+        {status.toLowerCase().includes("training") && <div>{status}</div>}
+      </div>
+    </ProtectedRoute>
   );
 };
 

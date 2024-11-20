@@ -11,6 +11,7 @@ from firebase_admin import auth, firestore
 from functools import wraps
 import logging
 from firebase_service import db
+from firebase_admin.firestore import FieldFilter
 
 
 
@@ -93,7 +94,7 @@ def verify_user():
 
         # Check if user exists in Firestore
         users_ref = db.collection('users')
-        user_doc = users_ref.where('email', '==', user_email).limit(1).get()
+        user_doc = users_ref.where(filter=FieldFilter('email', '==', user_email)).limit(1).get()
 
         if not len(user_doc):
             # Create new user if doesn't exist
@@ -377,4 +378,4 @@ if __name__ == '__main__':
     if os.path.exists('trainer/trainer.yml'):
         recognizer.read('trainer/trainer.yml')
  
-    socketio.run(app, debug=True, port=5000)
+    socketio.run(app, debug=True, port=5000,use_reloader=True)

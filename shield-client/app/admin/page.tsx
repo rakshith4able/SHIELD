@@ -10,6 +10,7 @@ import {
   FiXCircle as XCircle,
   FiMail as Mail,
 } from "react-icons/fi";
+import { ProtectedRoute } from "../components/ProtectedRoute";
 
 interface User {
   id: string;
@@ -170,116 +171,122 @@ export default function UserManagement() {
   );
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-4xl">
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
+    <ProtectedRoute requiredRole="admin">
+      <div className="container mx-auto px-4 py-6 max-w-4xl">
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        )}
 
-      <h1 className="text-3xl font-bold mb-6 text-gray-800">User Management</h1>
+        <h1 className="text-3xl font-bold mb-6 text-gray-800">
+          User Management
+        </h1>
 
-      {/* Create User Form */}
-      <form
-        onSubmit={createUser}
-        className="bg-white shadow-md rounded-lg p-6 mb-6"
-      >
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <div className="relative">
-              <input
-                type="email"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-                placeholder="Enter Gmail address"
-                required
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-              <Mail
-                className="absolute left-3 top-2.5 text-gray-400"
-                size={20}
-              />
+        {/* Create User Form */}
+        <form
+          onSubmit={createUser}
+          className="bg-white shadow-md rounded-lg p-6 mb-6"
+        >
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <input
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="Enter Gmail address"
+                  required
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <Mail
+                  className="absolute left-3 top-2.5 text-gray-400"
+                  size={20}
+                />
+              </div>
             </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 disabled:opacity-50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <PlusCircle size={20} />
+                <span>Add User</span>
+              </div>
+            </button>
           </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 disabled:opacity-50 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <PlusCircle size={20} />
-              <span>Add User</span>
-            </div>
-          </button>
+        </form>
+
+        {/* Search Bar */}
+        <div className="mb-6">
+          <input
+            type="text"
+            placeholder="Search users..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
         </div>
-      </form>
 
-      {/* Search Bar */}
-      <div className="mb-6">
-        <input
-          type="text"
-          placeholder="Search users..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        />
-      </div>
-
-      {/* Users List */}
-      <div className="bg-white shadow-md rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-gray-700">Email</th>
-                <th className="px-4 py-3 text-left text-gray-700">
-                  Created At
-                </th>
-                <th className="px-4 py-3 text-right text-gray-700">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {loading ? (
+        {/* Users List */}
+        <div className="bg-white shadow-md rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
                 <tr>
-                  <td colSpan={3} className="text-center py-4 text-gray-500">
-                    <div className="flex justify-center items-center space-x-2">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-                      <span>Loading...</span>
-                    </div>
-                  </td>
+                  <th className="px-4 py-3 text-left text-gray-700">Email</th>
+                  <th className="px-4 py-3 text-left text-gray-700">
+                    Created At
+                  </th>
+                  <th className="px-4 py-3 text-right text-gray-700">
+                    Actions
+                  </th>
                 </tr>
-              ) : filteredUsers.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="text-center py-4 text-gray-500">
-                    No users found
-                  </td>
-                </tr>
-              ) : (
-                filteredUsers.map((u) => (
-                  <tr key={u.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">{u.email}</td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {new Date(u.createdAt || "").toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => deleteUser(u.id)}
-                        disabled={loading}
-                        className="text-red-500 hover:text-red-700 disabled:opacity-50 transition-colors"
-                        title="Delete user"
-                      >
-                        <Trash2 size={20} />
-                      </button>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {loading ? (
+                  <tr>
+                    <td colSpan={3} className="text-center py-4 text-gray-500">
+                      <div className="flex justify-center items-center space-x-2">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                        <span>Loading...</span>
+                      </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : filteredUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="text-center py-4 text-gray-500">
+                      No users found
+                    </td>
+                  </tr>
+                ) : (
+                  filteredUsers.map((u) => (
+                    <tr key={u.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">{u.email}</td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {new Date(u.createdAt || "").toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => deleteUser(u.id)}
+                          disabled={loading}
+                          className="text-red-500 hover:text-red-700 disabled:opacity-50 transition-colors"
+                          title="Delete user"
+                        >
+                          <Trash2 size={20} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-    </div>
+    </ProtectedRoute>
   );
 }
