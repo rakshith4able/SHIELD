@@ -134,6 +134,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (user) {
         try {
           const token = await user.getIdToken();
+
+          // Step 1: Verify the user using the token
           const response = await axios.post<VerifyUserResponse>(
             "http://localhost:5000/verify-user",
             { token },
@@ -143,14 +145,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           );
 
           const data = response.data;
+
+          // Step 2: If the user is authorized, fetch user details
           if (data.authorized && data.role) {
-            setUser(user);
-            setUserRole(data.role);
-            // Don't redirect here to prevent unwanted redirects on page refresh
+            setUser(user); // Set user in state
+            setUserRole(data.role); // Set role in state
+
+            const userDetailsResponse = await axios.get<UserDetails>(
+              "http://localhost:5000/user/me",
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            );
+
+            // Step 3: Set the fetched user details in state
+            setUserDetails(userDetailsResponse.data);
+
+            // Optional: Handle role-based redirects after the user is verified
+            handleRoleBasedRedirect(data.role);
           } else {
+            // If not authorized, sign out and reset states
             await firebaseSignOut(auth);
             setUser(null);
             setUserRole(null);
+            setUserDetails(null);
             setError("Not authorized to access this application");
           }
         } catch (error) {
@@ -158,18 +176,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await firebaseSignOut(auth);
           setUser(null);
           setUserRole(null);
+          setUserDetails(null); // Clear user details in case of error
           setError("Error verifying user credentials");
         }
       } else {
         setUser(null);
-        setUserDetails(null);
+        setUserDetails(null); // Clear user details if no user is signed in
         setUserRole(null);
       }
-      setLoading(false);
+
+      setLoading(false); // Set loading to false after auth check is complete
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, [router]); // Dependency on router to ensure effect runs on mount
 
   return (
     <AuthContext.Provider

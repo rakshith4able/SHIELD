@@ -4,11 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { useRouter } from "next/navigation";
 import { ProtectedRoute } from "../components/ProtectedRoute";
+import { useAuth } from "../context/AuthContext";
 
 const CameraComponent = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [userName, setUserName] = useState<string>("");
+  const { userDetails, user } = useAuth();
+  const id = userDetails?.id;
   const [socket, setSocket] = useState<Socket | null>(null);
   const [capturing, setCapturing] = useState<boolean>(false);
   const [detectedFaces, setDetectedFaces] = useState<
@@ -20,39 +22,46 @@ const CameraComponent = () => {
   const captureIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    const newSocket = io("http://localhost:5000");
-    setSocket(newSocket);
+    const fetchToken = async () => {
+      const token = await user?.getIdToken();
+      const newSocket = io("http://localhost:5000", {
+        query: { token },
+      });
+      setSocket(newSocket);
 
-    newSocket.on("frame_captured", (data) => {
-      if (data.faces) {
-        setDetectedFaces(data.faces);
-      }
-      if (data.status) {
+      newSocket.on("frame_captured", (data) => {
+        if (data.faces) {
+          setDetectedFaces(data.faces);
+        }
+        if (data.status) {
+          setStatus(data.status);
+        }
+        if (data.progress) {
+          setProgress(data.progress);
+        }
+      });
+
+      newSocket.on("capture_completed", (data) => {
         setStatus(data.status);
-      }
-      if (data.progress) {
-        setProgress(data.progress);
-      }
-    });
+        setDetectedFaces([]);
+        setCapturing(false);
+        if (captureIntervalRef.current) {
+          clearInterval(captureIntervalRef.current);
+        }
+      });
 
-    newSocket.on("capture_completed", (data) => {
-      setStatus(data.status);
-      setDetectedFaces([]);
-      setCapturing(false);
-      if (captureIntervalRef.current) {
-        clearInterval(captureIntervalRef.current);
-      }
-    });
+      newSocket.on("training_completed", (data) => {
+        setStatus(data.status);
+        setTimeout(() => router.push("/"), 3000); // Redirect after 3 seconds
+      });
 
-    newSocket.on("training_completed", (data) => {
-      setStatus(data.status);
-      setTimeout(() => router.push("/"), 3000); // Redirect after 3 seconds
-    });
-
-    return () => {
-      newSocket.close();
+      return () => {
+        newSocket.close();
+      };
     };
-  }, [router]);
+
+    fetchToken();
+  }, [router, user]);
 
   useEffect(() => {
     const getCameraStream = async () => {
@@ -122,7 +131,7 @@ const CameraComponent = () => {
 
       socket?.emit("upload_image", {
         image: imageData,
-        face_id: userName,
+        face_id: id,
       });
     }, 100);
   };
@@ -135,23 +144,6 @@ const CameraComponent = () => {
   return (
     <ProtectedRoute>
       <div className="flex flex-col items-center">
-        <form onSubmit={handleSubmit} className="mb-4">
-          <input
-            type="text"
-            placeholder="Enter your name"
-            value={userName}
-            onChange={(e) => setUserName(e.target.value)}
-            required
-            className="border border-gray-300 rounded p-2"
-          />
-          <button
-            type="submit"
-            className="ml-2 px-4 py-2 bg-blue-500 text-white rounded"
-            disabled={capturing}
-          >
-            {capturing ? "Capturing..." : "Start Capturing"}
-          </button>
-        </form>
         <div className="relative">
           <video
             ref={videoRef}
@@ -167,6 +159,15 @@ const CameraComponent = () => {
             className="absolute top-0 left-0 pointer-events-none"
           />
         </div>
+        <form onSubmit={handleSubmit} className="mb-4">
+          <button
+            type="submit"
+            className="ml-2 px-4 py-2 bg-blue-500 text-white rounded"
+            disabled={capturing}
+          >
+            {capturing ? "Capturing..." : "Start Capturing"}
+          </button>
+        </form>
         {capturing && (
           <div className="mt-4">
             <p>{progress.toPrecision(2)}%</p>

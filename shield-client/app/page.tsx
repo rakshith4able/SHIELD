@@ -3,10 +3,26 @@
 import Link from "next/link";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { useAuth } from "./context/AuthContext";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
-  const { userDetails, user } = useAuth();
-  console.log(userDetails, user);
+  const { userDetails } = useAuth();
+  const router = useRouter();
+  const [redirectToCamera, setRedirectToCamera] = useState(false);
+
+  // If userDetails is available and isFaceTrained is false, show the button
+  useEffect(() => {
+    if (userDetails && userDetails.isFaceTrained === false) {
+      setRedirectToCamera(true);
+    }
+  }, [userDetails]);
+
+  const handleRedirectToCamera = () => {
+    if (userDetails) {
+      router.push(`/recognize`);
+    }
+  };
 
   return (
     <ProtectedRoute>
@@ -23,19 +39,30 @@ export default function Home() {
         </p>
 
         <div className="flex flex-col space-y-4">
-          <Link
-            href="/camera"
-            className="px-6 py-3 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-700 transition duration-200 text-center"
-          >
-            Capture your face
-          </Link>
+          {redirectToCamera ? (
+            <button
+              onClick={handleRedirectToCamera}
+              className="px-6 py-3 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-700 transition duration-200 text-center"
+            >
+              Access Secure Route
+            </button>
+          ) : (
+            <>
+              <Link
+                href="/camera"
+                className="px-6 py-3 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-700 transition duration-200 text-center"
+              >
+                Capture your face
+              </Link>
 
-          <Link
-            href="/recognize"
-            className="px-6 py-3 bg-purple-500 text-white rounded-lg shadow-md hover:bg-purple-700 transition duration-200 text-center"
-          >
-            Face Recognition
-          </Link>
+              <Link
+                href="/recognize"
+                className="px-6 py-3 bg-purple-500 text-white rounded-lg shadow-md hover:bg-purple-700 transition duration-200 text-center"
+              >
+                Face Recognition
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </ProtectedRoute>
