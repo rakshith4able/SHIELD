@@ -11,9 +11,7 @@ from firebase_admin import auth, firestore
 from functools import wraps
 import logging
 from firebase_service import db
-from firebase_admin.firestore import FieldFilter
-
-
+from firebase_admin.firestore import FieldFilter,SERVER_TIMESTAMP
 
 
 app = Flask(__name__)
@@ -91,27 +89,55 @@ def verify_user():
         # Verify the Firebase token
         decoded_token = auth.verify_id_token(data['token'])
         user_email = decoded_token['email']
+        firebase_uid = decoded_token['uid']
 
-        # Check if user exists in Firestore
+        # Check if the user exists in Firestore
         users_ref = db.collection('users')
-        user_doc = users_ref.where(filter=FieldFilter('email', '==', user_email)).limit(1).get()
+        user_doc = users_ref.where('email', '==', user_email).limit(1).get()
 
         if not len(user_doc):
-            # Create new user if doesn't exist
-            new_user_data = {
-                'email': user_email,
-                'uid': decoded_token['uid'],
-                'role': 'user',
-                'created_at': firestore.SERVER_TIMESTAMP
-            }
-            users_ref.add(new_user_data)
+            # If user doesn't exist in Firestore, do not add to Firebase Auth
             return jsonify({
-                'authorized': True,
-                'role': 'user',
-                'isNewUser': True
+                'authorized': False,
+                'message': 'User does not exist in Firestore. User not added to Firebase Authentication.'
+            }), 404
+
+        # If user exists, retrieve user data
+        user_data = user_doc[0].to_dict()
+
+        # Get the Firestore document reference and ID
+        old_user_ref = user_doc[0].reference
+        old_user_id = user_doc[0].id
+
+        # Update Firestore document fields
+        old_user_ref.update({
+            'isValidated': True,  # Change from False to True
+            'name': decoded_token.get('name', user_data.get('name', '')),  # Set fullName if available
+            'photoURL': decoded_token.get('picture', user_data.get('photoURL', '')),  # Update photoURL if available
+            'updatedAt': firestore.SERVER_TIMESTAMP  # Set updated timestamp
+        })
+         
+        # Set custom claims for the user in Firebase Authentication (only first time)
+        if not user_data.get('isValidated', False):
+            # Set custom claims for the user in Firebase Authentication
+            user_role = user_data.get('role', 'user')  # Get role from Firestore
+            auth.set_custom_user_claims(firebase_uid, {'role': user_role})
+
+        # Sync Firestore document ID with Firebase UID
+        if old_user_id != firebase_uid:
+            # Create a new document with Firebase UID as the document ID
+            new_user_ref = users_ref.document(firebase_uid)
+
+            # Copy all the data from the old document to the new one
+            new_user_ref.set({
+                **user_data,
+                'uid': firebase_uid,  # Ensure the new document has the correct UID
+                'id': firebase_uid  # Sync Firestore document ID with Firebase UID
             })
 
-        user_data = user_doc[0].to_dict()
+            # Delete the old document to avoid duplication
+            old_user_ref.delete()
+
         return jsonify({
             'authorized': True,
             'role': user_data.get('role', 'user'),
@@ -123,9 +149,7 @@ def verify_user():
             'authorized': False,
             'message': str(e)
         }), 401
-
-
-
+        
 def authenticated_only(f):
     @wraps(f)
     def wrapped(*args, **kwargs):

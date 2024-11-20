@@ -18,6 +18,7 @@ interface VerifyUserResponse {
 
 interface AuthContextType {
   user: User | null;
+  userDetails: UserDetails | null;
   loading: boolean;
   userRole: string | null;
   signInWithGoogle: () => Promise<void>;
@@ -25,8 +26,21 @@ interface AuthContextType {
   error: string | null;
 }
 
+interface UserDetails {
+  id: string;
+  name: string;
+  email: string;
+  photoURL: string;
+  isFaceTrained: boolean;
+  isValidated: boolean;
+  lastLoginAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 const AuthContext = createContext<AuthContextType>({
   user: null,
+  userDetails: null,
   loading: true,
   userRole: null,
   signInWithGoogle: async () => {},
@@ -36,6 +50,7 @@ const AuthContext = createContext<AuthContextType>({
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +87,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.authorized && data.role) {
         setUser(result.user);
         setUserRole(data.role);
+
+        const userDetailsResponse = await axios.get<UserDetails>(
+          "http://localhost:5000/user/me",
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        setUserDetails(userDetailsResponse.data);
+
         handleRoleBasedRedirect(data.role);
       } else {
         await firebaseSignOut(auth);
@@ -94,6 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await firebaseSignOut(auth);
       setUser(null);
       setUserRole(null);
+      setUserDetails(null);
       setError(null);
       router.push("/"); // Redirect to home page after sign out
     } catch (error) {
@@ -136,6 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } else {
         setUser(null);
+        setUserDetails(null);
         setUserRole(null);
       }
       setLoading(false);
@@ -148,6 +175,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        userDetails,
         loading,
         userRole,
         signInWithGoogle,

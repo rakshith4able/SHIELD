@@ -2,8 +2,12 @@
 
 import Link from "next/link";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { useAuth } from "./context/AuthContext";
 
 export default function Home() {
+  const { userDetails, user } = useAuth();
+  console.log(userDetails, user);
+
   return (
     <ProtectedRoute>
       {/* Main Content */}
