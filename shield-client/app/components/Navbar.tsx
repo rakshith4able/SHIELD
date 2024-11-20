@@ -3,16 +3,15 @@
 import Link from "next/link";
 import { FaSignOutAlt, FaUserCircle } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
-import { auth } from "../lib/firebase";
 
 type NavbarProps = {};
 
 function Navbar({}: NavbarProps) {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
 
   const handleSignOut = async () => {
     try {
-      await auth.signOut();
+      await signOut();
     } catch (error) {
       console.error("Error signing out:", error);
     }

@@ -2,10 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { auth } from "../../lib/firebase";
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { FaGoogle } from "react-icons/fa";
 import axios from "axios";
+import { useAuth } from "@/app/context/AuthContext";
 
 interface VerifyUserResponse {
   authorized: boolean;
@@ -13,35 +12,13 @@ interface VerifyUserResponse {
 }
 
 export default function SignIn() {
-  const router = useRouter();
-  const [error, setError] = useState("");
+  const { error, signInWithGoogle, loading } = useAuth();
 
   const handleGoogleSignIn = async () => {
     try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const token = await result.user.getIdToken();
-
-      const response = await axios.post<VerifyUserResponse>(
-        "http://localhost:5000/verify-user",
-        { token },
-        { headers: { "Content-Type": "application/json" } }
-      );
-
-      const data = response.data;
-      if (data.authorized) {
-        if (data.role === "admin") {
-          router.push("/admin");
-        } else {
-          router.push("/camera");
-        }
-      } else {
-        setError("Not authorized to access this application");
-        await auth.signOut();
-      }
-    } catch (error) {
-      setError("Failed to sign in");
-      console.error(error);
+      await signInWithGoogle();
+    } catch (err) {
+      console.log(err);
     }
   };
 

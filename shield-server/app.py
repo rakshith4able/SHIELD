@@ -1,4 +1,3 @@
-import firebase_admin
 from flask import Flask,request,jsonify
 from flask_socketio import SocketIO, emit,disconnect
 import cv2
@@ -8,19 +7,41 @@ import os
 from flask_cors import CORS
 from PIL import Image
 import pickle
-from firebase_admin import auth, credentials, firestore
+from firebase_admin import auth, firestore
 from functools import wraps
+import logging
+from firebase_service import db
 
 
-# Initialize Firebase Admin
-cred = credentials.Certificate('./firebase_service.json')
-firebase_admin.initialize_app(cred)
-db = firestore.client()
 
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,  # Log level (e.g., DEBUG, INFO, WARNING, ERROR)
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+)
+
+# Create a logger for the app
+app.logger.setLevel(logging.INFO)
+
+CORS(app, resources={
+    r"/*": {
+        "origins": ["http://localhost:3000"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True,
+        "expose_headers": ["Content-Type", "Authorization"],
+        "max_age": 3600,
+        "allow_credentials": True
+    }
+})
+
+
 socketio = SocketIO(app, cors_allowed_origins="*")
+
+from routes.users import users_bp
+app.register_blueprint(users_bp)
 
 # Ensure the dataset and trainer directories exist
 for dir in ['dataset', 'trainer']:
@@ -355,4 +376,5 @@ if __name__ == '__main__':
     load_user_data()
     if os.path.exists('trainer/trainer.yml'):
         recognizer.read('trainer/trainer.yml')
+ 
     socketio.run(app, debug=True, port=5000)
