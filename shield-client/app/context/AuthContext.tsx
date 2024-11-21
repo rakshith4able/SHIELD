@@ -25,6 +25,7 @@ interface AuthContextType {
   loading: boolean;
   userRole: string | null;
   signInWithGoogle: () => Promise<AxiosError | undefined>;
+  updateUserDetails: (updates: Partial<UserDetails>) => void;
   signOut: () => Promise<void>;
   error: {
     message: string;
@@ -52,6 +53,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   userRole: null,
   signInWithGoogle: async () => undefined,
+  updateUserDetails: () => {},
   signOut: async () => {},
   error: null,
 });
@@ -66,6 +68,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     errorCode?: string;
   } | null>(null);
   const router = useRouter();
+
+  const updateUserDetails = (updates: Partial<UserDetails>) => {
+    setUserDetails((prev) => (prev ? { ...prev, ...updates } : null));
+  };
 
   // Token refresh method
   const refreshToken = async (user: User): Promise<string | null> => {
@@ -249,6 +255,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         userRole,
         signInWithGoogle,
+        updateUserDetails,
         signOut,
         error,
       }}

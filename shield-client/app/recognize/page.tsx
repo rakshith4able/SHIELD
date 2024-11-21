@@ -43,7 +43,7 @@ const VIDEO_HEIGHT = 480;
 
 const RecognitionComponent: React.FC = () => {
   const router = useRouter();
-  const { userDetails, user } = useAuth();
+  const { userDetails, user, updateUserDetails } = useAuth();
   const id = userDetails?.id;
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -116,6 +116,7 @@ const RecognitionComponent: React.FC = () => {
 
   const handleFinalAuthorization = (data: FinalAuthorization) => {
     setAuthState(data);
+    // setAuthState({ status: "Authorized" });
     setShowModal(true);
   };
 
@@ -275,12 +276,17 @@ const RecognitionComponent: React.FC = () => {
   const handleModalClose = async () => {
     setShowModal(false);
 
-    if (authState.status === "Authorized" || true) {
+    if (authState.status === "Authorized") {
       try {
         // Call the Flask route with the user ID
         const token = await user?.getIdToken(true);
         const userId = userDetails?.id;
-        console.log("token", token);
+
+        updateUserDetails({ canAccessSecureRoute: true });
+        // Revert access after 30 seconds
+        setTimeout(() => {
+          updateUserDetails({ canAccessSecureRoute: false });
+        }, 30000); // 30 seconds
         const response = await axios.patch(
           `http://localhost:5000/set_secure_access/${userId}`,
           {},
@@ -291,10 +297,12 @@ const RecognitionComponent: React.FC = () => {
           }
         );
 
+        // Temporarily allow secure access
+
         console.log("API Response:", response.data);
 
         // Navigate to the secure route
-        router.push("/secureRoute");
+        router.push("/");
       } catch (error) {
         console.error("Error calling secure access API:", error);
       }
@@ -386,7 +394,7 @@ const RecognitionComponent: React.FC = () => {
             <div className="space-y-2">
               <p className="text-gray-700">
                 {authState.status === "Authorized"
-                  ? `Successfully verified!}`
+                  ? `Successfully verified!`
                   : authState.reason || "Unable to verify your identity"}
               </p>
             </div>

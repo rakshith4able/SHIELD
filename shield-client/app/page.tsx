@@ -60,9 +60,17 @@ export default function Home() {
             {userDetails.role === "user" && userDetails.isFaceTrained && (
               <Link
                 href="/recognize"
+                className="px-6 py-3 my-3 bg-green-500 text-white rounded-lg shadow-md hover:bg-green-700 transition duration-200 text-center"
+              >
+                Verify Your face to access the secure route
+              </Link>
+            )}
+            {userDetails.role === "user" && userDetails.isFaceTrained && (
+              <Link
+                href="/secureRoute"
                 className="px-6 py-3 bg-green-500 text-white rounded-lg shadow-md hover:bg-green-700 transition duration-200 text-center"
               >
-                Access Secure Route
+                Secure Route
               </Link>
             )}
           </>
