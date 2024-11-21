@@ -8,6 +8,7 @@ import { AiOutlineAlert as AlertCircle } from "react-icons/ai";
 import { BiCamera as Camera } from "react-icons/bi";
 import { RiLoader2Line as Loader2 } from "react-icons/ri";
 import { FiShield as Shield, FiShieldOff as ShieldOff } from "react-icons/fi";
+import axios from "axios";
 
 interface RecognizedFace {
   x: number;
@@ -271,10 +272,32 @@ const RecognitionComponent: React.FC = () => {
     }, RECOGNITION_DURATION);
   };
 
-  const handleModalClose = () => {
+  const handleModalClose = async () => {
     setShowModal(false);
-    if (authState.status === "Authorized") {
-      router.push("/secureRoute");
+
+    if (authState.status === "Authorized" || true) {
+      try {
+        // Call the Flask route with the user ID
+        const token = await user?.getIdToken(true);
+        const userId = userDetails?.id;
+        console.log("token", token);
+        const response = await axios.patch(
+          `http://localhost:5000/set_secure_access/${userId}`,
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        console.log("API Response:", response.data);
+
+        // Navigate to the secure route
+        router.push("/secureRoute");
+      } catch (error) {
+        console.error("Error calling secure access API:", error);
+      }
     }
   };
 
@@ -296,18 +319,18 @@ const RecognitionComponent: React.FC = () => {
         </div>
       )}
 
-      <div className="relative w-full rounded-xl overflow-hidden shadow-lg">
+      <div className="relative  rounded-xl overflow-hidden shadow-lg">
         <video
           ref={videoRef}
           autoPlay
           playsInline
           width={VIDEO_WIDTH}
           height={VIDEO_HEIGHT}
-          className="border rounded object-cover bg-gray-100"
+          className="border rounded object-cover bg-gray-100  w-full h-full"
         />
         <canvas
           ref={canvasRef}
-          className="absolute top-0 left-0 w-full h-full pointer-events-none"
+          className="absolute top-0 left-0 pointer-events-none"
         />
       </div>
 

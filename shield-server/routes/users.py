@@ -5,6 +5,7 @@ from datetime import datetime,timezone
 from firebase_service import db
 from firebase_admin.firestore import FieldFilter 
 import json
+from threading import Timer
 
 
 users_bp = Blueprint('users', __name__)
@@ -186,3 +187,25 @@ def delete_user(id):
     except Exception as e:
         current_app.logger.error(f"Error during user deletion: {str(e)}")
         return jsonify({'message': str(e)}), 500
+
+@users_bp.route('/set_secure_access/<string:user_id>', methods=['PATCH'])
+@verify_token
+def set_secure_access(user_id):
+    try:
+        # Reference to the user document
+        user_ref = db.collection('users').document(user_id)
+
+        # Update `canAccessSecureRoute` to True
+        user_ref.update({"canAccessSecureRoute": True})
+
+        # Function to reset `canAccessSecureRoute` to False
+        def reset_access():
+            user_ref.update({"canAccessSecureRoute": False})
+
+        # Schedule the reset after 30 seconds
+        Timer(30.0, reset_access).start()
+
+        return jsonify({"message": f"Access granted for user {user_id} for 30 seconds"}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

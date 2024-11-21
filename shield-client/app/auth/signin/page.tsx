@@ -76,7 +76,7 @@ export default function SignIn() {
       )}
 
       {/* Server-side error with persistent display */}
-      {serverError && (
+      {!error && serverError && (
         <div
           className={`
             mb-4 px-4 py-3 rounded relative 

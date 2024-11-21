@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         );
 
         setUserDetails(userDetailsResponse.data);
-
+        router.push("/");
         return undefined; // Indicate successful verification
       } else {
         // Handle unauthorized scenarios

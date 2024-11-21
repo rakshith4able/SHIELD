@@ -27,7 +27,7 @@ app.logger.setLevel(logging.INFO)
 CORS(app, resources={
     r"/*": {
         "origins": ["http://localhost:3000"],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "methods": ["GET", "POST", "PUT","PATCH", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
         "supports_credentials": True,
         "expose_headers": ["Content-Type", "Authorization"],
@@ -618,27 +618,6 @@ def get_final_authorization(data):
         
         app.logger.info(f"Authorized: {authorized} ")
         
-        if authorized:
-            # Get user document from Firestore
-            user_ref = db.collection('users').document(username)  # Adjust the query as per your user document structure
-
-            # Check if user exists
-            user_doc = user_ref.get()
-            if user_doc.exists:
-                # Temporarily update 'canAccessSecureRoute' to True
-                user_ref.update({
-                    'canAccessSecureRoute': True
-                })
-
-                # Wait for 20 seconds (this will block the current thread, so use with caution)
-                time.sleep(20)
-
-                # Revert 'canAccessSecureRoute' back to False
-                user_ref.update({
-                    'canAccessSecureRoute': False
-                })
-
-                app.logger.info(f"User {username} canAccessSecureRoute temporarily updated to True and reverted.")
 
     except Exception as e:
         app.logger.error(f"Authorization error: {str(e)}")

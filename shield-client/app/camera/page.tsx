@@ -9,7 +9,7 @@ import { useAuth } from "../context/AuthContext";
 const CameraComponent = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { userDetails, user } = useAuth();
+  const { userDetails, user, signOut } = useAuth();
   const id = userDetails?.id;
   const [socket, setSocket] = useState<Socket | null>(null);
   const [capturing, setCapturing] = useState<boolean>(false);
@@ -51,8 +51,13 @@ const CameraComponent = () => {
       });
 
       newSocket.on("training_completed", (data) => {
-        setStatus(data.status);
-        setTimeout(() => router.push("/"), 3000); // Redirect after 3 seconds
+        setStatus(
+          "Training Completed! Please login again to access the secure route."
+        );
+
+        setTimeout(() => {
+          signOut();
+        }, 5000); // Redirect after 3 seconds
       });
 
       return () => {

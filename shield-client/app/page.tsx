@@ -24,7 +24,7 @@ export default function Home() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen flex flex-col justify-center items-center bg-gray-100 pt-16">
-        <h1 className="text-4xl font-bold text-blue-600 mb-6">
+        <h1 className="text-4xl font-bold text-blue-600 mb-6 text-center">
           Welcome to S.H.I.E.L.D.
         </h1>
         <p className="text-lg text-gray-700 text-center mb-8 max-w-2xl">
