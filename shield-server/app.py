@@ -12,7 +12,7 @@ from functools import wraps
 import logging
 from firebase_service import db
 from firebase_admin.firestore import FieldFilter,SERVER_TIMESTAMP
-import json
+import time
 
 app = Flask(__name__)
 # Configure logging
@@ -41,6 +41,8 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 
 from routes.users import users_bp
 app.register_blueprint(users_bp)
+from routes.authorization_logs import admin_bp
+app.register_blueprint(admin_bp)
 
 # Ensure the dataset and trainer directories exist
 for dir in ['dataset', 'trainer']:
@@ -79,11 +81,16 @@ def verify_token(f):
     
     return decorated_function
 
+
 @app.route('/verify-user', methods=['POST'])
 def verify_user():
     data = request.get_json()
     if not data or 'token' not in data:
-        return jsonify({'authorized': False}), 400
+        return jsonify({
+            'authorized': False,
+            'errorCode': 'INVALID_TOKEN',
+            'message': 'Invalid or missing authentication token.'
+        }), 400
 
     try:
         # Verify the Firebase token
@@ -96,10 +103,11 @@ def verify_user():
         user_doc = users_ref.where('email', '==', user_email).limit(1).get()
 
         if not len(user_doc):
-            # If user doesn't exist in Firestore, do not add to Firebase Auth
+            # If user doesn't exist in Firestore, return detailed error
             return jsonify({
                 'authorized': False,
-                'message': 'User does not exist in Firestore. User not added to Firebase Authentication.'
+                'errorCode': 'USER_NOT_FOUND',
+                'message': 'User does not exist in our system. Please contact support.'
             }), 404
 
         # If user exists, retrieve user data
@@ -111,17 +119,24 @@ def verify_user():
 
         # Update Firestore document fields
         old_user_ref.update({
-            'isValidated': True,  # Change from False to True
-            'name': decoded_token.get('name', user_data.get('name', '')),  # Set fullName if available
-            'photoURL': decoded_token.get('picture', user_data.get('photoURL', '')),  # Update photoURL if available
-            'updatedAt': firestore.SERVER_TIMESTAMP  # Set updated timestamp
+            'isValidated': True,
+            'name': decoded_token.get('name', user_data.get('name', '')),
+            'photoURL': decoded_token.get('picture', user_data.get('photoURL', '')),
+            'updatedAt': firestore.SERVER_TIMESTAMP
         })
          
-        # Set custom claims for the user in Firebase Authentication (only first time)
+        # Handle first-time login and custom claims setup
         if not user_data.get('isValidated', False):
             # Set custom claims for the user in Firebase Authentication
-            user_role = user_data.get('role', 'user')  # Get role from Firestore
+            user_role = user_data.get('role', 'user')
             auth.set_custom_user_claims(firebase_uid, {'role': user_role})
+            
+            return jsonify({
+                'authorized': False,
+                'errorCode': 'FIRST_TIME_LOGIN',
+                'message': f'Your {user_role} account is set up. Please sign in again to activate your privileges.',
+                'role': user_role
+            }), 401  # Changed to 401 to indicate authentication needs to be redone
 
         # Sync Firestore document ID with Firebase UID
         if old_user_id != firebase_uid:
@@ -131,8 +146,8 @@ def verify_user():
             # Copy all the data from the old document to the new one
             new_user_ref.set({
                 **user_data,
-                'uid': firebase_uid,  # Ensure the new document has the correct UID
-                'id': firebase_uid  # Sync Firestore document ID with Firebase UID
+                'uid': firebase_uid,
+                'id': firebase_uid
             })
 
             # Delete the old document to avoid duplication
@@ -144,11 +159,18 @@ def verify_user():
             'isNewUser': False
         })
 
+    except auth.InvalidIdTokenError:
+        return jsonify({
+            'authorized': False,
+            'errorCode': 'INVALID_TOKEN',
+            'message': 'Invalid authentication token. Please try signing in again.'
+        }), 401
     except Exception as e:
         return jsonify({
             'authorized': False,
-            'message': str(e)
-        }), 401
+            'errorCode': 'UNKNOWN_ERROR',
+            'message': 'An unexpected error occurred. Please try again later.'
+        }), 500
         
 def authenticated_only(f):
     @wraps(f)
@@ -436,6 +458,12 @@ def handle_upload(data):
                     'trained_faces': trained_faces
                 })
                 
+                # Update the user's object in the users collection
+                db.collection('users').document(face_id).update({
+                    'isFaceTrained': True
+                })
+                                
+                
             except Exception as e:
                 emit('training_error', {
                     'status': "Training failed",
@@ -568,7 +596,7 @@ def get_final_authorization(data):
         # Enhanced authorization criteria
         authorized = (
             len(recognized_faces) == 1 and  # Exactly one face detected
-            best_match['confidence'] >= 50 and  # Higher confidence threshold
+            best_match['confidence'] >= 30 and  # Higher confidence threshold
             best_match['name_match'] and  # Name must match
             best_match['name'] != "Unknown"  # Must be a known user
         )
@@ -587,6 +615,30 @@ def get_final_authorization(data):
             'confidence': best_match['confidence'],
             'reason': get_authorization_reason(authorized, best_match)
         })
+        
+        app.logger.info(f"Authorized: {authorized} ")
+        
+        if authorized:
+            # Get user document from Firestore
+            user_ref = db.collection('users').document(username)  # Adjust the query as per your user document structure
+
+            # Check if user exists
+            user_doc = user_ref.get()
+            if user_doc.exists:
+                # Temporarily update 'canAccessSecureRoute' to True
+                user_ref.update({
+                    'canAccessSecureRoute': True
+                })
+
+                # Wait for 20 seconds (this will block the current thread, so use with caution)
+                time.sleep(20)
+
+                # Revert 'canAccessSecureRoute' back to False
+                user_ref.update({
+                    'canAccessSecureRoute': False
+                })
+
+                app.logger.info(f"User {username} canAccessSecureRoute temporarily updated to True and reverted.")
 
     except Exception as e:
         app.logger.error(f"Authorization error: {str(e)}")
@@ -600,7 +652,7 @@ def get_authorization_reason(authorized, match):
     if authorized:
         return "Face successfully verified with high confidence"
     
-    if match['confidence'] < 60:
+    if match['confidence'] < 50:
         return "Confidence too low for secure verification"
     if not match['name_match']:
         return "Name mismatch"

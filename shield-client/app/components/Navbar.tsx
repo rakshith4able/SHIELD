@@ -18,7 +18,7 @@ function Navbar({}: NavbarProps) {
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 bg-white p-4">
+    <nav className="fixed top-0 left-0 right-0 bg-white p-4 w-full z-10">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
         <Link href="/" className="text-xl font-bold text-blue-600">
           S.H.I.E.L.D.

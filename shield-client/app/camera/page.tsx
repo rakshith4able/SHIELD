@@ -165,7 +165,7 @@ const CameraComponent = () => {
             className="ml-2 px-4 py-2 bg-blue-500 text-white rounded"
             disabled={capturing}
           >
-            {capturing ? "Capturing..." : "Start Capturing"}
+            {capturing ? "Capturing..." : "Train Your Face"}
           </button>
         </form>
         {capturing && (

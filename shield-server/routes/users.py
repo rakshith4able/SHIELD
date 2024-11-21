@@ -47,7 +47,9 @@ def get_current_user():
         "name": user_data.get('name'),
         "photoURL": user_data.get('photoURL'),
         "isFaceTrained": user_data.get('isFaceTrained'),
-        "isValidated": user_data.get('isValidated')
+        "isValidated": user_data.get('isValidated'),
+        "canAccessSecureRoute":user_data.get('canAccessSecureRoute'),
+        "role":user_data.get('role')
     })
 
 @users_bp.route('/user/me', methods=['PUT'])
@@ -130,6 +132,7 @@ def create_user():
             'role': 'user',           
             'isFaceTrained': False, 
             'isValidated': False,   
+            'canAccessSecureRoute':False,
             'createdAt': datetime.now(timezone.utc),  
             'updatedAt': datetime.now(timezone.utc)   
         }

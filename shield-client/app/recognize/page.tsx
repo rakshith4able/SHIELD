@@ -34,7 +34,7 @@ interface FinalAuthorization {
 
 const RECOGNITION_DURATION = 5000;
 const CAPTURE_INTERVAL = 500;
-const CONFIDENCE_THRESHOLD = 60; // Updated to match backend
+const CONFIDENCE_THRESHOLD = 60;
 const SOCKET_URL =
   process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000";
 const VIDEO_WIDTH = 640;
@@ -170,6 +170,12 @@ const RecognitionComponent: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (isInitialized && id) {
+      startRecognition();
+    }
+  }, [isInitialized, id]);
+
   // Enhanced face overlay drawing
   useEffect(() => {
     if (!isInitialized) return;
@@ -221,10 +227,6 @@ const RecognitionComponent: React.FC = () => {
         requestAnimationFrame(drawFaceOverlays);
       }
     };
-
-    if (isRecognizing) {
-      drawFaceOverlays();
-    }
   }, [recognizedFaces, isRecognizing, isInitialized]);
 
   const captureFrame = (): string | null => {
@@ -272,7 +274,7 @@ const RecognitionComponent: React.FC = () => {
   const handleModalClose = () => {
     setShowModal(false);
     if (authState.status === "Authorized") {
-      router.push("/dashboard");
+      router.push("/secureRoute");
     }
   };
 
@@ -301,7 +303,7 @@ const RecognitionComponent: React.FC = () => {
           playsInline
           width={VIDEO_WIDTH}
           height={VIDEO_HEIGHT}
-          className="w-full h-full object-cover bg-gray-100"
+          className="border rounded object-cover bg-gray-100"
         />
         <canvas
           ref={canvasRef}
@@ -361,14 +363,9 @@ const RecognitionComponent: React.FC = () => {
             <div className="space-y-2">
               <p className="text-gray-700">
                 {authState.status === "Authorized"
-                  ? `Successfully verified as ${authState.recognizedAs}`
+                  ? `Successfully verified!}`
                   : authState.reason || "Unable to verify your identity"}
               </p>
-              {authState.confidence && (
-                <p className="text-sm text-gray-500">
-                  Confidence: {authState.confidence.toFixed(1)}%
-                </p>
-              )}
             </div>
 
             <button
